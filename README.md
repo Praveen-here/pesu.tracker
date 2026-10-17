@@ -8,8 +8,32 @@ A clean, minimalist, and highly accurate Academic Dashboard for PES University s
 - **CGPA Tracker**: Tracks your ISA and ESA marks without making assumptions. Calculates the exact marks needed in upcoming assessments to maintain a CGPA ≥ 8.0 (for placement readiness).
 - **Rank & Percentile Insight** *(Current Semester)*: Shows where you stand academically compared to your classmates — based on the university's own published ISA mark distributions. Displays an animated overall standing card (e.g. "Top 15%") with a per-subject breakdown, so you know exactly which subjects you're excelling in and which need attention. Data is sourced directly from PESU Academy's result graphs and requires no manual input.
 - **Honest Analytics**: Unlike other trackers, PESU Tracker does not assume arbitrary ESA grades. It provides exact ranges based on your current ISA scores.
-- **Minimalist UI**: A sleek, monochrome dark mode interface optimized for speed and readability.
+- **Apple-inspired UI**: Clean, minimal design built on Apple's design principles — automatic light & dark mode, glass navigation, spring animations, and full Reduce Motion support.
 - **Secure**: Credentials are used strictly for real-time fetching via PESU Academy and are never permanently stored. Sessions are securely managed via Redis.
+
+## Screenshots
+
+### Sign in
+![Sign in](docs/screenshots/login.png)
+
+### Home
+![Home](docs/screenshots/home.png)
+
+### Attendance Tracker
+![Attendance Tracker](docs/screenshots/attendance.png)
+
+### CGPA Tracker
+![CGPA Tracker](docs/screenshots/cgpa.png)
+
+![How it's calculated](docs/screenshots/cgpa-sheet.png)
+
+### Mobile — light & dark
+<p align="center">
+  <img src="docs/screenshots/mobile-attendance-light.png" width="200" alt="Attendance on mobile, light mode" />
+  <img src="docs/screenshots/mobile-attendance-dark.png" width="200" alt="Attendance on mobile, dark mode" />
+  <img src="docs/screenshots/mobile-cgpa-light.png" width="200" alt="CGPA on mobile, light mode" />
+  <img src="docs/screenshots/mobile-cgpa-dark.png" width="200" alt="CGPA on mobile, dark mode" />
+</p>
 
 ## Tech Stack
 
