@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import ProgressBar from './ProgressBar';
 import { AlertCircle, Zap, CheckCircle2 } from 'lucide-react';
+import { rise } from '@/lib/motion';
 
 export interface Subject {
   courseCode: string;
@@ -40,29 +41,22 @@ export default function SubjectCard({ subject, index }: Props) {
 
   return (
     <motion.div
-      className="glass-card"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05, ease: 'easeOut' }}
-      whileHover={{ y: -2 }}
+      className="surface"
+      {...rise(index)}
       style={{
-        padding: '1.25rem',
-        borderLeft: `3px solid ${statusColor}`,
+        padding: '1.125rem 1.125rem 1rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.85rem',
+        gap: '0.9rem',
       }}
     >
       {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3
+            className="t-headline"
             style={{
-              fontSize: '0.92rem',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              lineHeight: 1.3,
-              marginBottom: '0.2rem',
+              marginBottom: '0.15rem',
               overflow: 'hidden',
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -71,46 +65,36 @@ export default function SubjectCard({ subject, index }: Props) {
           >
             {courseName}
           </h3>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-            {courseCode}
-          </span>
+          <span className="t-footnote t-mono secondary">{courseCode}</span>
         </div>
 
         {/* Percentage badge */}
-        <span
-          className={badgeClass}
-          style={{
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            padding: '0.25rem 0.6rem',
-            borderRadius: '6px',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
+        <span className={`badge t-num ${badgeClass}`} style={{ fontSize: '0.9375rem', fontWeight: 700, flexShrink: 0 }}>
           {percentage}%
         </span>
       </div>
 
       {/* Progress bar */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Attendance</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+          <span className="t-footnote secondary">Attendance</span>
+          <span className="t-footnote secondary" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {attended}/{total} classes
           </span>
         </div>
-        <ProgressBar percentage={percentage} />
-        {/* 75% marker */}
-        <div style={{ position: 'relative', height: 0 }}>
+        <div style={{ position: 'relative' }}>
+          <ProgressBar percentage={percentage} />
+          {/* 75% marker */}
           <div
+            aria-hidden
             style={{
               position: 'absolute',
               left: '75%',
-              bottom: '2px',
-              width: '1px',
-              height: '10px',
-              background: '#27272a',
+              top: '-3px',
+              width: '2px',
+              height: '12px',
+              borderRadius: '1px',
+              background: 'var(--label-3)',
             }}
           />
         </div>
@@ -118,19 +102,17 @@ export default function SubjectCard({ subject, index }: Props) {
 
       {/* Analytics row */}
       <div
+        className="t-subhead"
         style={{
-          background: status === 'danger' ? 'var(--danger-dim)' : status === 'warning' ? 'var(--warn-dim)' : 'var(--safe-dim)',
-          border: `1px solid ${statusColor}22`,
-          borderRadius: '6px',
-          padding: '0.5rem 0.75rem',
-          fontSize: '0.78rem',
-          color: statusColor,
+          background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+          borderRadius: '12px',
+          padding: '0.6rem 0.8rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
+          gap: '0.55rem',
         }}
       >
-        <AnalyticsIcon className="w-3.5 h-3.5" />
+        <AnalyticsIcon className="w-4 h-4" style={{ color: statusColor, flexShrink: 0 }} strokeWidth={2.2} />
         <span>{analyticsText}</span>
       </div>
     </motion.div>

@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Lock } from 'lucide-react';
+import ActivityIndicator from '@/components/ActivityIndicator';
+import BrandMark from '@/components/BrandMark';
+import { spring } from '@/lib/motion';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,172 +57,142 @@ export default function LoginPage() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1.5rem',
+        padding: 'max(2rem, env(safe-area-inset-top)) 16px max(2rem, env(safe-area-inset-bottom))',
       }}
     >
-      {/* Logo / Title */}
       <motion.div
-        initial={{ opacity: 0, y: -24 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
-        style={{ textAlign: 'center', marginBottom: '2.5rem' }}
+        transition={spring}
+        style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column' }}
       >
-        <h1
-          style={{
-            fontSize: 'clamp(2rem, 7vw, 3rem)',
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-            color: '#ffffff',
-            lineHeight: 1.2,
-            marginBottom: '0.5rem',
-          }}
-        >
-          PESU Tracker
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', letterSpacing: '0.04em' }}>
-          Track · Bunk · Stay Safe
-        </p>
-      </motion.div>
+        {/* App icon + title */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <BrandMark size={44} />
+          </div>
+          <h1 className="t-title" style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>
+            PESU Tracker
+          </h1>
+          <p className="t-subhead secondary">Track · Bunk · Stay Safe</p>
+        </div>
 
-      {/* Login Card */}
-      <motion.div
-        className="glass-card"
-        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
-        style={{ width: '100%', maxWidth: '420px', padding: '2rem' }}
-      >
-        <h2
-          style={{
-            fontSize: '1.1rem',
-            fontWeight: 600,
-            marginBottom: '1.75rem',
-            color: '#ffffff',
-            letterSpacing: '0.02em',
-          }}
-        >
-          Sign in with PESU Academy
-        </h2>
+        <h2 className="section-header">Sign in with PESU Academy</h2>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* SRN */}
-          <div>
-            <label
-              htmlFor="srn-input"
-              style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.4rem', letterSpacing: '0.06em' }}
-            >
-              SRN / Username
-            </label>
-            <input
-              id="srn-input"
-              className="pesu-input"
-              type="text"
-              placeholder="e.g. PES1PG25CA317"
-              value={srn}
-              onChange={(e) => setSrn(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e as unknown as FormEvent); }}
-              autoComplete="username"
-              spellCheck={false}
-              autoCapitalize="characters"
-            />
-          </div>
+          <div className="field-group">
+            {/* SRN */}
+            <div className="field">
+              <label htmlFor="srn-input">SRN</label>
+              <input
+                id="srn-input"
+                type="text"
+                placeholder="e.g. PES1PG25CA317"
+                value={srn}
+                onChange={(e) => setSrn(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e as unknown as FormEvent); }}
+                autoComplete="username"
+                spellCheck={false}
+                autoCapitalize="characters"
+              />
+            </div>
 
-          {/* Password */}
-          <div>
-            <label
-              htmlFor="password-input"
-              style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.4rem', letterSpacing: '0.06em' }}
-            >
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
+            {/* Password */}
+            <div className="field">
+              <label htmlFor="password-input">Password</label>
               <input
                 id="password-input"
-                className="pesu-input"
                 type={showPass ? 'text' : 'password'}
-                placeholder="Your PESU Academy password"
+                placeholder="Required"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e as unknown as FormEvent); }}
                 autoComplete="current-password"
-                style={{ paddingRight: '3rem' }}
               />
               <button
                 type="button"
                 id="toggle-password"
+                className="pressable"
                 onClick={() => setShowPass(!showPass)}
+                aria-label={showPass ? 'Hide password' : 'Show password'}
                 style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  padding: '0.25rem',
+                  width: 36,
+                  height: 36,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  color: 'var(--label-3)',
+                  flexShrink: 0,
                 }}
               >
-                {showPass ? <EyeOff className="w-4 h-4 text-zinc-500" /> : <Eye className="w-4 h-4 text-zinc-500" />}
+                {showPass ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
               </button>
             </div>
           </div>
 
           {/* Error */}
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {error && (
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                style={{
-                  color: 'var(--danger)',
-                  fontSize: '0.83rem',
-                  background: 'var(--danger-dim)',
-                  border: '1px solid rgba(239,68,68,0.2)',
-                  borderRadius: '8px',
-                  padding: '0.6rem 0.85rem',
-                }}
+                transition={spring}
+                style={{ overflow: 'hidden' }}
               >
-                {error}
-              </motion.p>
+                <p
+                  role="alert"
+                  className="t-subhead"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    color: 'var(--danger)',
+                    background: 'var(--danger-dim)',
+                    borderRadius: '12px',
+                    padding: '0.7rem 0.9rem',
+                  }}
+                >
+                  <AlertCircle className="w-4 h-4" strokeWidth={2.2} style={{ flexShrink: 0, marginTop: 2 }} />
+                  {error}
+                </p>
+              </motion.div>
             )}
           </AnimatePresence>
 
           {/* Submit */}
-          <motion.button
+          <button
             id="login-btn"
-            className="pesu-btn"
+            className="btn-primary pressable"
             type="submit"
             disabled={loading}
-            whileTap={{ scale: 0.97 }}
             style={{ marginTop: '0.5rem' }}
           >
             {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                <SpinnerIcon />
-                Authenticating...
-              </span>
+              <>
+                <ActivityIndicator size={18} color="#ffffff" />
+                Signing In…
+              </>
             ) : (
               'Sign In'
             )}
-          </motion.button>
+          </button>
         </form>
 
         <p
+          className="t-footnote secondary"
           style={{
-            marginTop: '1.5rem',
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)',
+            marginTop: '1.25rem',
+            padding: '0 1rem',
             textAlign: 'center',
-            lineHeight: 1.6,
+            display: 'flex',
+            gap: '0.4rem',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
           }}
         >
-          Your credentials are never stored. They are used only to fetch your attendance and marks from PESU Academy and are discarded immediately.
+          <Lock className="w-3.5 h-3.5" style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>Your credentials are never stored. They are used only to fetch your attendance and marks from PESU Academy and are discarded immediately.</span>
         </p>
       </motion.div>
 
@@ -227,29 +200,12 @@ export default function LoginPage() {
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        style={{ marginTop: '2rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+        transition={{ delay: 0.4 }}
+        className="t-caption tertiary"
+        style={{ marginTop: '2.5rem' }}
       >
         Not affiliated with PES University
       </motion.p>
     </main>
-  );
-}
-
-function SpinnerIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#000"
-      strokeWidth="2"
-      style={{ animation: 'spin 0.8s linear infinite' }}
-    >
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
   );
 }

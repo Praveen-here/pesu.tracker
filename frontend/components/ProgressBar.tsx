@@ -13,12 +13,13 @@ export default function ProgressBar({ percentage }: Props) {
   const color =
     pct >= 75 ? 'var(--safe)' : pct >= 65 ? 'var(--warn)' : 'var(--danger)';
 
+  // Slide a full-width fill with transform so the animation stays on the compositor.
   useEffect(() => {
     if (!fillRef.current) return;
-    fillRef.current.style.width = '0%';
+    fillRef.current.style.transform = 'translateX(-100%)';
     const timer = setTimeout(() => {
       if (fillRef.current) {
-        fillRef.current.style.width = `${pct}%`;
+        fillRef.current.style.transform = `translateX(${pct - 100}%)`;
       }
     }, 150);
     return () => clearTimeout(timer);
@@ -29,7 +30,7 @@ export default function ProgressBar({ percentage }: Props) {
       <div
         ref={fillRef}
         className="progress-fill"
-        style={{ width: 0, background: color }}
+        style={{ background: color }}
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}

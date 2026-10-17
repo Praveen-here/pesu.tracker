@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { spring } from '@/lib/motion';
 
 interface Props {
   percentage: number;
@@ -20,13 +21,6 @@ export default function OverallRing({ percentage, size = 140, strokeWidth = 10 }
   const color =
     pct >= 75 ? 'var(--safe)' : pct >= 65 ? 'var(--warn)' : 'var(--danger)';
 
-  const glowColor =
-    pct >= 75
-      ? 'rgba(34,197,94,0.4)'
-      : pct >= 65
-      ? 'rgba(245,158,11,0.4)'
-      : 'rgba(239,68,68,0.4)';
-
   const progressRef = useRef<SVGCircleElement>(null);
 
   useEffect(() => {
@@ -42,10 +36,10 @@ export default function OverallRing({ percentage, size = 140, strokeWidth = 10 }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-      style={{ position: 'relative', width: size, height: size }}
+      transition={spring}
+      style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}
     >
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
         {/* Track */}
@@ -54,8 +48,8 @@ export default function OverallRing({ percentage, size = 140, strokeWidth = 10 }
           cy={cy}
           r={radius}
           fill="none"
-          stroke="#18181b"
           strokeWidth={strokeWidth}
+          style={{ stroke: `color-mix(in srgb, ${color} 22%, transparent)` }}
         />
         {/* Progress */}
         <circle
@@ -64,13 +58,13 @@ export default function OverallRing({ percentage, size = 140, strokeWidth = 10 }
           cy={cy}
           r={radius}
           fill="none"
-          stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference}
           style={{
-            transition: 'stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)',
+            stroke: color,
+            transition: 'stroke-dashoffset 1.2s var(--ease-ios)',
           }}
         />
       </svg>
@@ -86,12 +80,10 @@ export default function OverallRing({ percentage, size = 140, strokeWidth = 10 }
           justifyContent: 'center',
         }}
       >
-        <span
-          style={{ fontSize: size * 0.22, color, lineHeight: 1, fontWeight: 700 }}
-        >
+        <span className="t-num" style={{ fontSize: size * 0.24, lineHeight: 1, fontWeight: 700 }}>
           {pct}%
         </span>
-        <span style={{ fontSize: size * 0.09, color: 'var(--text-muted)', marginTop: 2 }}>
+        <span className="secondary" style={{ fontSize: Math.max(11, size * 0.1), marginTop: 2, fontWeight: 500 }}>
           overall
         </span>
       </div>

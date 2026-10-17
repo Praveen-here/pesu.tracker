@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { Home, ArrowLeft, CheckCircle2, AlertCircle, RefreshCw, LogOut, X, TrendingUp } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, TrendingUp, ChevronRight, ChevronDown } from 'lucide-react';
+import NavBar from '@/components/NavBar';
+import ActivityIndicator from '@/components/ActivityIndicator';
+import { spring, sheetSpring, tap, rise } from '@/lib/motion';
 import { logout, refreshResults, getPercentile } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -149,7 +152,8 @@ export default function CGPAPage() {
     router.replace('/');
   }
 
-  if (loading) return <Spinner />;
+  // Full-page skeleton only on first load; refreshes keep content and spin the nav button.
+  if (loading && !data) return <Spinner />;
   if (error)   return <ErrorScreen msg={error} onRetry={fetchResults} onBack={() => router.push('/home')} />;
   if (!data || data.results.length === 0) return <EmptyScreen onBack={() => router.push('/home')} />;
 
@@ -157,146 +161,157 @@ export default function CGPAPage() {
   const completedSems = data.results.filter(s => s.isCompleted && s.sgpa);
 
   return (
-    <main style={{ minHeight: '100dvh', padding: '1.5rem 1rem 5rem', maxWidth: '860px', margin: '0 auto' }}>
-      
-      {/* ── Info Overlay ── */}
+    <>
+      {/* ── Info Sheet ── */}
       <AnimatePresence>
         {showOverlay && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 50,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem'
-            }}
-          >
+          <>
             <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="glass-card"
-              style={{ padding: '2rem', maxWidth: '440px', width: '100%', position: 'relative', background: '#09090b' }}
-            >
-              <button onClick={closeOverlay} style={{ position: 'absolute', top: '1.2rem', right: '1.2rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                <X className="w-5 h-5 hover:text-white transition-colors" />
-              </button>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#fff', marginBottom: '1rem' }}>How it's calculated</h2>
-              <ul style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li>Your goal is <strong>CGPA ≥ 8.0</strong>, which means scoring a Grade B in each subject.</li>
-                <li>Grade B requires <strong>105 out of 150</strong> total marks.</li>
-                <li><strong>No assumptions</strong> are made for ISA and ESA marks; we only calculate based on exact scores needed.</li>
-                <li><strong>Assignments</strong> are fixed at a realistic average of <strong>8.5 / 10</strong>.</li>
-              </ul>
-              <button onClick={closeOverlay} style={{ marginTop: '1.5rem', width: '100%', background: '#fff', color: '#000', padding: '0.6rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}>
-                Got it
-              </button>
-            </motion.div>
-          </motion.div>
+              key="scrim"
+              className="sheet-scrim"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={spring}
+              onClick={closeOverlay}
+            />
+            <div className="sheet-host" key="sheet">
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="calc-sheet-title"
+                className="sheet"
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={sheetSpring}
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0.08, bottom: 1 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.y > 100 || info.velocity.y > 500) closeOverlay();
+                }}
+                style={{ position: 'relative' }}
+              >
+                <div className="grabber" aria-hidden />
+                <button
+                  onClick={closeOverlay}
+                  className="icon-btn pressable"
+                  aria-label="Close"
+                  style={{ position: 'absolute', top: '1rem', right: '1rem', width: 30, height: 30, color: 'var(--label-2)' }}
+                >
+                  <X className="w-4 h-4" strokeWidth={2.6} />
+                </button>
+                <h2 id="calc-sheet-title" className="t-title2" style={{ marginBottom: '1rem', paddingRight: '2.5rem' }}>
+                  How it&apos;s calculated
+                </h2>
+                <ul className="inset-fill t-subhead" style={{ listStyle: 'none', overflow: 'hidden' }}>
+                  {[
+                    <>Your goal is <strong>CGPA ≥ 8.0</strong>, which means scoring a Grade B in each subject.</>,
+                    <>Grade B requires <strong>105 out of 150</strong> total marks.</>,
+                    <><strong>No assumptions</strong> are made for ISA and ESA marks; we only calculate based on exact scores needed.</>,
+                    <><strong>Assignments</strong> are fixed at a realistic average of <strong>8.5 / 10</strong>.</>,
+                  ].map((item, i) => (
+                    <li
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        gap: '0.75rem',
+                        padding: '0.8rem 1rem',
+                        borderTop: i ? '0.5px solid var(--separator)' : 'none',
+                      }}
+                    >
+                      <CheckCircle2 className="w-[18px] h-[18px]" strokeWidth={2.2} style={{ color: 'var(--tint)', flexShrink: 0, marginTop: 1 }} />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={closeOverlay} className="btn-primary pressable" style={{ marginTop: '1.5rem' }}>
+                  Got it
+                </button>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
 
       {/* ── Header ── */}
-      <motion.header
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingBottom: '1rem',
-          borderBottom: '1px solid var(--card-border)',
-          marginBottom: '1.5rem',
-          gap: '0.75rem',
-          flexWrap: 'wrap'
-        }}
-      >
-        <h1 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.8rem)', fontWeight: 700, letterSpacing: '-0.02em', color: '#ffffff' }}>
-          CGPA Tracker
-        </h1>
-        <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
-          <button
-            className="text-zinc-400 hover:text-white transition-colors"
-            onClick={() => router.push('/home')}
-            title="Home"
-          >
-            <Home className="w-5 h-5" />
-          </button>
-          <button
-            className="text-zinc-400 hover:text-white transition-colors"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            title="Refresh"
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            className="text-zinc-400 hover:text-white transition-colors"
-            onClick={handleLogout}
-            title="Sign Out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </motion.header>
+      <NavBar
+        title="CGPA"
+        maxWidth="860px"
+        onBack={() => router.push('/home')}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        onLogout={handleLogout}
+      />
 
-      {/* ── CGPA + Percentile Summary ── */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
-        style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
-        {data.cgpa !== null && (
-          <ScoreCard label="Your CGPA" value={data.cgpa.toFixed(2)}
-            sub={data.cgpa >= 8 ? 'Placement ready' : 'Below 8.0'}
-            color={data.cgpa >= 8 ? 'var(--safe)' : 'var(--warn)'} />
+      <main className="page" style={{ maxWidth: '860px' }}>
+        <motion.div {...rise(0)} className="large-title-wrap">
+          <h1 className="t-large-title">CGPA Tracker</h1>
+        </motion.div>
+
+        {/* ── CGPA + Percentile Summary ── */}
+        <motion.div {...rise(1)}
+          style={{ display: 'flex', gap: '0.875rem', flexWrap: 'wrap', marginBottom: '1.75rem', alignItems: 'flex-start' }}>
+          {data.cgpa !== null && (
+            <ScoreCard label="Your CGPA" value={data.cgpa.toFixed(2)}
+              sub={data.cgpa >= 8 ? 'Placement ready' : 'Below 8.0'}
+              color={data.cgpa >= 8 ? 'var(--safe)' : 'var(--warn)'} />
+          )}
+          <PercentileCard data={percentile} loading={percentileLoading} />
+        </motion.div>
+
+        {/* ── Sem Tabs ── */}
+        {data.results.length > 1 && (
+          <motion.div {...rise(2)} style={{ marginBottom: '1.25rem' }}>
+            <div className="segmented" role="tablist" aria-label="Semester">
+              {data.results.map(r => (
+                <button
+                  key={r.semId}
+                  role="tab"
+                  aria-selected={selectedSem === r.semId}
+                  onClick={() => setSelectedSem(r.semId)}
+                  className="segment"
+                >
+                  {selectedSem === r.semId && (
+                    <motion.span layoutId="sem-thumb" className="segment-thumb" transition={spring} />
+                  )}
+                  <span className="segment-label">{r.semLabel} {r.isCompleted ? '✓' : ''}</span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
         )}
-        <PercentileCard data={percentile} loading={percentileLoading} />
-      </motion.div>
 
-      {/* ── Sem Tabs ── */}
-      {data.results.length > 1 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-          style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          {data.results.map(r => (
-            <button key={r.semId} onClick={() => setSelectedSem(r.semId)} style={{
-              padding: '0.4rem 1rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-              background: selectedSem === r.semId ? '#ffffff' : 'transparent',
-              border: `1px solid ${selectedSem === r.semId ? '#ffffff' : '#27272a'}`,
-              color: selectedSem === r.semId ? '#000000' : 'var(--text-secondary)', transition: 'all 0.2s',
-            }}>
-              {r.semLabel} {r.isCompleted ? '✓' : ''}
-            </button>
-          ))}
-        </motion.div>
-      )}
-
-      {/* ── Content ── */}
-      <AnimatePresence mode="wait">
-        <motion.div key={selectedSem} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-          {currentSem.isCompleted
-            ? <CompletedView sem={currentSem} />
-            : <InProgressView sem={currentSem} />}
-        </motion.div>
-      </AnimatePresence>
-    </main>
+        {/* ── Content ── */}
+        <AnimatePresence mode="wait">
+          <motion.div key={selectedSem} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }} transition={{ ...spring, visualDuration: 0.25 }}>
+            {currentSem.isCompleted
+              ? <CompletedView sem={currentSem} />
+              : <InProgressView sem={currentSem} />}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+    </>
   );
 }
 
 // ─── Completed Semester ────────────────────────────────────────────────────────
 function CompletedView({ sem }: { sem: SemResult }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        {sem.sgpa && <KV label="SGPA" value={sem.sgpa.toFixed(2)} color="#ffffff" />}
-        {sem.cgpa && <KV label="CGPA" value={sem.cgpa.toFixed(2)} color="var(--text-secondary)" />}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+      <div className="surface" style={{ padding: '1.1rem 1.5rem', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        {sem.sgpa && <KV label="SGPA" value={sem.sgpa.toFixed(2)} color="var(--label)" />}
+        {sem.cgpa && <KV label="CGPA" value={sem.cgpa.toFixed(2)} color="var(--label-2)" />}
         {sem.earnedCredits && sem.totalCredits && <KV label="Credits" value={`${sem.earnedCredits}/${sem.totalCredits}`} color="var(--safe)" />}
-        {sem.esaDescription && <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 'auto' }}>{sem.esaDescription}</p>}
+        {sem.esaDescription && <p className="t-footnote secondary" style={{ marginLeft: 'auto' }}>{sem.esaDescription}</p>}
       </div>
       {sem.subjects.map((sub, i) => (
-        <motion.div key={sub.courseCode} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
-          className="glass-card" style={{ padding: '1.2rem 1.5rem' }}>
+        <motion.div key={sub.courseCode} {...rise(i)}
+          className="surface" style={{ padding: '1.1rem 1.25rem' }}>
           <SubjectHead sub={sub} />
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
             {sub.isZeroCredit ? (
               // 0-credit subjects: only show ESA grade
               sub.marks.esa && <Chip label="Grade" val={sub.marks.esa} highlight />
@@ -319,26 +334,26 @@ function CompletedView({ sem }: { sem: SemResult }) {
 // ─── In-Progress Semester ──────────────────────────────────────────────────────
 function InProgressView({ sem }: { sem: SemResult }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
       {sem.subjects.map((sub, i) => {
         const a = sub.analysis;
         return (
           <motion.div key={sub.courseCode}
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="glass-card"
-            style={{ padding: '1.5rem', borderLeft: `3px solid ${borderColor(a)}` }}>
+            {...rise(i)}
+            className="surface"
+            style={{ padding: '1.25rem' }}>
 
             {/* Subject name + status */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-              <SubjectHead sub={sub} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+              <SubjectHead sub={sub} dot={borderColor(a)} />
               <StatusPill a={a} />
             </div>
 
             {/* 0-credit subject: just show grade */}
             {a.state === 'zero_credit' && (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              <p className="t-subhead secondary">
                 {sub.marks.esa ? (
-                  <>Grade: <strong style={{ color: '#ffffff' }}>{sub.marks.esa}</strong></>
+                  <>Grade: <strong style={{ color: 'var(--label)' }}>{sub.marks.esa}</strong></>
                 ) : (
                   'No credit subject — grade only, not included in CGPA calculation.'
                 )}
@@ -347,7 +362,7 @@ function InProgressView({ sem }: { sem: SemResult }) {
 
             {/* ISA 1 / ISA 2 / Assignment / Final ISA chips */}
             {a.state !== 'zero_credit' && a.currentIsa1 !== null && (
-              <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                 <Chip label="ISA 1 (done)" val={`${a.currentIsa1}/40`} highlight />
                 {a.currentIsa2 !== null && <Chip label="ISA 2 (done)" val={`${a.currentIsa2}/40`} highlight />}
                 {a.assignment !== null && <Chip label="Assignment" val={`${a.assignment}/10`} highlight />}
@@ -367,15 +382,15 @@ function InProgressView({ sem }: { sem: SemResult }) {
 
             {/* Complete */}
             {a.state === 'complete' && (
-              <p style={{ color: 'var(--safe)', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckCircle2 className="w-4 h-4" /> Semester complete — check the completed semester tab for your grade.
+              <p className="t-subhead" style={{ color: 'var(--safe)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle2 className="w-4 h-4" strokeWidth={2.2} style={{ flexShrink: 0 }} /> Semester complete — check the completed semester tab for your grade.
               </p>
             )}
 
             {/* Nothing yet */}
             {a.state === 'none' && (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-                No marks recorded yet. You need <strong style={{ color: '#ffffff' }}>105 / 150</strong> total for CGPA ≥ 8.
+              <p className="t-subhead secondary">
+                No marks recorded yet. You need <strong style={{ color: 'var(--label)' }}>105 / 150</strong> total for CGPA ≥ 8.
               </p>
             )}
           </motion.div>
@@ -389,54 +404,53 @@ function InProgressView({ sem }: { sem: SemResult }) {
 function ScenarioTable({ scenarios }: { scenarios: Scenario[] }) {
   return (
     <div>
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.6rem', letterSpacing: '0.04em' }}>
-        MINIMUM ESA NEEDED  (for CGPA ≥ 8) — depending on your ISA 2 score:
+      <p className="t-footnote secondary" style={{ fontWeight: 500, marginBottom: '0.5rem', padding: '0 4px' }}>
+        Minimum ESA needed for CGPA ≥ 8, depending on your ISA 2 score
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-        {scenarios.map((sc) => {
+      <div className="inset-fill" style={{ overflow: 'hidden' }}>
+        {scenarios.map((sc, i) => {
           const pct    = sc.minEsa / 100;
           const color  = sc.esaImpossible ? 'var(--danger)' : sc.esaSecured ? 'var(--safe)' : pct > 0.85 ? 'var(--warn)' : 'var(--safe)';
-          const rowBg  = sc.esaImpossible ? 'var(--danger-dim)' : sc.esaSecured ? 'var(--safe-dim)' : 'transparent';
           return (
             <div key={sc.isa2Val} style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.45rem 0.75rem',
-              borderRadius: '6px', background: rowBg, flexWrap: 'wrap', border: '1px solid #18181b'
+              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 1rem',
+              flexWrap: 'wrap', borderTop: i ? '0.5px solid var(--separator)' : 'none',
             }}>
               {/* ISA2 label */}
-              <div style={{ minWidth: '110px' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ISA 2 = </span>
-                <span style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.95rem' }}>{sc.isa2Val}/40</span>
+              <div style={{ minWidth: '104px' }}>
+                <span className="t-footnote secondary">ISA 2 = </span>
+                <span className="t-num" style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{sc.isa2Val}/40</span>
               </div>
 
               {/* Arrow */}
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>→</span>
+              <ChevronRight className="w-4 h-4" style={{ color: 'var(--label-3)' }} strokeWidth={2.4} />
 
               {/* ESA needed */}
               <div style={{ flex: 1, minWidth: '120px' }}>
                 {sc.esaSecured ? (
-                  <span style={{ fontWeight: 600, color: 'var(--safe)', fontSize: '0.92rem' }}>Already secured</span>
+                  <span className="t-subhead" style={{ fontWeight: 600, color: 'var(--safe)' }}>Already secured</span>
                 ) : sc.esaImpossible ? (
-                  <span style={{ fontWeight: 600, color: 'var(--danger)', fontSize: '0.92rem' }}>Not achievable</span>
+                  <span className="t-subhead" style={{ fontWeight: 600, color: 'var(--danger)' }}>Not achievable</span>
                 ) : (
                   <>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>need ESA ≥ </span>
-                    <span style={{ fontWeight: 700, fontSize: '1.1rem', color }}>{sc.minEsa}/100</span>
+                    <span className="t-footnote secondary">need ESA ≥ </span>
+                    <span className="t-num" style={{ fontWeight: 700, fontSize: '1.0625rem', color }}>{sc.minEsa}/100</span>
                   </>
                 )}
               </div>
 
               {/* Mini bar */}
               {!sc.esaImpossible && !sc.esaSecured && (
-                <div style={{ width: '80px', height: '4px', background: '#27272a', borderRadius: '99px', overflow: 'hidden' }}>
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${sc.minEsa}%` }} transition={{ duration: 0.6, ease: 'easeOut' }}
-                    style={{ height: '100%', background: color, borderRadius: '99px' }} />
+                <div style={{ width: '72px', height: '5px', background: 'var(--fill-2)', borderRadius: '99px', overflow: 'hidden' }}>
+                  <motion.div initial={{ x: '-100%' }} animate={{ x: `${sc.minEsa - 100}%` }} transition={{ ...spring, visualDuration: 0.6 }}
+                    style={{ width: '100%', height: '100%', background: color, borderRadius: '99px' }} />
                 </div>
               )}
             </div>
           );
         })}
       </div>
-      <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.6rem' }}>
+      <p className="t-caption secondary" style={{ marginTop: '0.5rem', padding: '0 4px' }}>
         * Assignment assumed 8.5/10. All other values are exact math — no guessing.
       </p>
     </div>
@@ -447,18 +461,18 @@ function ScenarioTable({ scenarios }: { scenarios: Scenario[] }) {
 function ExactEsa({ minEsa, impossible, secured }: { minEsa: number; impossible: boolean; secured: boolean }) {
   const color = impossible ? 'var(--danger)' : secured ? 'var(--safe)' : minEsa > 85 ? 'var(--warn)' : 'var(--safe)';
   return (
-    <div style={{ background: '#18181b', borderRadius: '8px', padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>YOU NEED IN ESA (exact — no assumptions)</p>
+    <div className="inset-fill" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <p className="t-footnote secondary" style={{ fontWeight: 500 }}>You need in ESA (exact — no assumptions)</p>
       {secured ? (
-        <p style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--safe)' }}>Already secured CGPA ≥ 8</p>
+        <p className="t-title2" style={{ color: 'var(--safe)' }}>Already secured CGPA ≥ 8</p>
       ) : impossible ? (
-        <p style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--danger)' }}>Cannot reach 105 even with 100 in ESA</p>
+        <p className="t-headline" style={{ color: 'var(--danger)' }}>Cannot reach 105 even with 100 in ESA</p>
       ) : (
         <>
-          <p style={{ fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>
-            {minEsa}<span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 400 }}>/100</span>
+          <p className="t-num" style={{ fontSize: '2.75rem', fontWeight: 700, color, lineHeight: 1 }}>
+            {minEsa}<span className="secondary" style={{ fontSize: '1.0625rem', fontWeight: 500 }}>/100</span>
           </p>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          <p className="t-footnote secondary">
             This is the exact minimum. ISA 1 + ISA 2 are both known, so no assumptions made.
           </p>
         </>
@@ -468,20 +482,23 @@ function ExactEsa({ minEsa, impossible, secured }: { minEsa: number; impossible:
 }
 
 // ─── Small helpers ─────────────────────────────────────────────────────────────
-function SubjectHead({ sub }: { sub: Subject }) {
+function SubjectHead({ sub, dot }: { sub: Subject; dot?: string }) {
   return (
-    <div>
-      <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>{sub.courseCode}</p>
-      <p style={{ fontSize: '1rem', fontWeight: 600, color: '#ffffff', marginTop: '0.1rem', lineHeight: 1.3 }}>{sub.courseName}</p>
+    <div style={{ minWidth: 0 }}>
+      <p className="t-footnote t-mono secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        {dot && <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />}
+        {sub.courseCode}
+      </p>
+      <p className="t-headline" style={{ marginTop: '0.15rem' }}>{sub.courseName}</p>
     </div>
   );
 }
 
 function Chip({ label, val, highlight }: { label: string; val: string; highlight?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-      <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: highlight ? '#ffffff' : 'var(--text-secondary)' }}>{val}</span>
+    <div className="inset-fill" style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', padding: '0.5rem 0.85rem', borderRadius: '12px', minWidth: '88px' }}>
+      <span className="t-caption secondary" style={{ fontWeight: 500 }}>{label}</span>
+      <span className="t-num" style={{ fontSize: '1.0625rem', fontWeight: 600, color: highlight ? 'var(--label)' : 'var(--label-2)' }}>{val}</span>
     </div>
   );
 }
@@ -489,20 +506,19 @@ function Chip({ label, val, highlight }: { label: string; val: string; highlight
 function KV({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>{label}</p>
-      <p style={{ fontSize: '1.3rem', fontWeight: 700, color }}>{value}</p>
+      <p className="t-footnote secondary" style={{ marginBottom: '0.1rem', fontWeight: 500 }}>{label}</p>
+      <p className="t-num" style={{ fontSize: '1.625rem', fontWeight: 700, color, lineHeight: 1.1 }}>{value}</p>
     </div>
   );
 }
 
 function ScoreCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-      className="glass-card" style={{ padding: '1rem 1.4rem', flex: '1 1 140px', minWidth: '140px' }}>
-      <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: '0.3rem' }}>{label.toUpperCase()}</p>
-      <p style={{ fontWeight: 700, fontSize: '1.8rem', color, lineHeight: 1 }}>{value}</p>
-      <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{sub}</p>
-    </motion.div>
+    <div className="surface" style={{ padding: '1.1rem 1.4rem', flex: '1 1 150px', minWidth: '150px' }}>
+      <p className="t-footnote secondary" style={{ fontWeight: 500, marginBottom: '0.3rem' }}>{label}</p>
+      <p className="t-num" style={{ fontWeight: 700, fontSize: '2.25rem', color, lineHeight: 1 }}>{value}</p>
+      <p className="t-footnote secondary" style={{ marginTop: '0.4rem' }}>{sub}</p>
+    </div>
   );
 }
 
@@ -512,72 +528,65 @@ function PercentileCard({ data, loading }: { data: PercentileData | null; loadin
 
   if (loading) {
     return (
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        className="glass-card" style={{ padding: '1.2rem 1.5rem', flex: '1 1 200px', minWidth: '200px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', border: '3px solid #27272a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <RefreshCw className="w-4 h-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
+      <div className="surface" style={{ padding: '1.1rem 1.4rem', flex: '1 1 220px', minWidth: '220px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', border: '5px solid var(--fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--label-2)', flexShrink: 0 }}>
+          <ActivityIndicator size={18} />
         </div>
         <div>
-          <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>COMPUTING RANK</p>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Analyzing class data...</p>
+          <p className="t-footnote secondary" style={{ fontWeight: 500 }}>Computing rank</p>
+          <p className="t-subhead" style={{ marginTop: '0.1rem' }}>Analyzing class data…</p>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        className="glass-card" style={{ padding: '1rem 1.4rem', flex: '1 1 200px', minWidth: '200px' }}>
-        <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: '0.3rem' }}>CLASS STANDING</p>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Not enough data yet</p>
-      </motion.div>
+      <div className="surface" style={{ padding: '1.1rem 1.4rem', flex: '1 1 220px', minWidth: '220px' }}>
+        <p className="t-footnote secondary" style={{ fontWeight: 500, marginBottom: '0.3rem' }}>Class standing</p>
+        <p className="t-subhead secondary">Not enough data yet</p>
+      </div>
     );
   }
 
   const pct = data.overallPercentile;
-  const glowColor = pct >= 80 ? '#22c55e' : pct >= 60 ? '#3b82f6' : pct >= 40 ? '#eab308' : '#ef4444';
+  const glowColor = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--blue)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
   const circumference = 2 * Math.PI * 24; // r=24
   const dashOffset = circumference - (circumference * pct) / 100;
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="glass-card"
+      whileTap={tap}
+      className="surface card-link"
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
       style={{
-        padding: '1.2rem 1.5rem',
+        padding: '1.1rem 1.4rem',
         flex: '2 1 280px',
         minWidth: '280px',
         cursor: 'pointer',
         position: 'relative',
         overflow: 'hidden',
-        borderColor: `${glowColor}22`,
+        userSelect: 'none',
       }}
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={(e) => { if (e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
     >
-      {/* Subtle glow background */}
-      <div style={{
-        position: 'absolute', top: '-30px', right: '-30px',
-        width: '120px', height: '120px', borderRadius: '50%',
-        background: `radial-gradient(circle, ${glowColor}15 0%, transparent 70%)`,
-        pointerEvents: 'none',
-      }} />
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', position: 'relative' }}>
         {/* Animated Percentile Ring */}
         <div style={{ position: 'relative', width: 60, height: 60, flexShrink: 0 }}>
           <svg width="60" height="60" viewBox="0 0 60 60" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="30" cy="30" r="24" fill="none" stroke="#27272a" strokeWidth="4" />
+            <circle cx="30" cy="30" r="24" fill="none" strokeWidth="6" style={{ stroke: `color-mix(in srgb, ${glowColor} 22%, transparent)` }} />
             <motion.circle
               cx="30" cy="30" r="24" fill="none"
-              stroke={glowColor}
-              strokeWidth="4"
+              strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={circumference}
+              style={{ stroke: glowColor }}
               initial={{ strokeDashoffset: circumference }}
               animate={{ strokeDashoffset: dashOffset }}
-              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+              transition={{ ...spring, visualDuration: 1, delay: 0.3 }}
             />
           </svg>
           <div style={{
@@ -585,7 +594,7 @@ function PercentileCard({ data, loading }: { data: PercentileData | null; loadin
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexDirection: 'column',
           }}>
-            <span style={{ fontSize: '1rem', fontWeight: 800, color: glowColor, lineHeight: 1 }}>
+            <span className="t-num" style={{ fontSize: '0.9375rem', fontWeight: 700, lineHeight: 1 }}>
               {data.topPercentage}%
             </span>
           </div>
@@ -593,61 +602,65 @@ function PercentileCard({ data, loading }: { data: PercentileData | null; loadin
 
         {/* Text */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
-            <TrendingUp className="w-3.5 h-3.5" style={{ color: glowColor }} />
-            <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.06em' }}>
-              {data.semLabel?.toUpperCase()} STANDING
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.15rem' }}>
+            <TrendingUp className="w-3.5 h-3.5" strokeWidth={2.4} style={{ color: glowColor }} />
+            <p className="t-footnote secondary" style={{ fontWeight: 500 }}>
+              {data.semLabel} Standing
             </p>
           </div>
-          <p style={{ fontWeight: 700, fontSize: '1.15rem', color: '#ffffff', lineHeight: 1.2 }}>
+          <p className="t-title2">
             Top {data.topPercentage}%
           </p>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+          <p className="t-footnote secondary" style={{ marginTop: '0.15rem' }}>
             {data.comparisonText} · {data.standing}
           </p>
         </div>
+
+        <motion.span animate={{ rotate: expanded ? 180 : 0 }} transition={spring} style={{ display: 'flex', color: 'var(--label-3)', alignSelf: 'center' }}>
+          <ChevronDown className="w-5 h-5" strokeWidth={2.4} />
+        </motion.span>
       </div>
 
       {/* Expanded: Subject breakdown */}
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {expanded && data.subjects && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            style={{ overflow: 'hidden', marginTop: '1rem' }}
+            transition={spring}
+            style={{ overflow: 'hidden' }}
           >
-            <div style={{ borderTop: '1px solid #27272a', paddingTop: '0.75rem' }}>
-              <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
-                SUBJECT BREAKDOWN
+            <div style={{ borderTop: '0.5px solid var(--separator)', paddingTop: '0.85rem', marginTop: '1rem' }}>
+              <p className="t-footnote secondary" style={{ fontWeight: 500, marginBottom: '0.6rem' }}>
+                Subject breakdown
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {data.subjects.map(sub => {
-                  const barColor = sub.percentile >= 80 ? '#22c55e' : sub.percentile >= 60 ? '#3b82f6' : sub.percentile >= 40 ? '#eab308' : '#ef4444';
+                  const barColor = sub.percentile >= 80 ? 'var(--green)' : sub.percentile >= 60 ? 'var(--blue)' : sub.percentile >= 40 ? 'var(--orange)' : 'var(--red)';
                   return (
                     <div key={sub.courseCode}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.3rem', gap: '0.5rem' }}>
+                        <span className="t-footnote" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
                           {sub.courseName}
                         </span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: barColor }}>
+                        <span className="t-footnote t-num" style={{ fontWeight: 700, color: barColor }}>
                           Top {100 - sub.percentile}%
                         </span>
                       </div>
-                      <div style={{ height: 4, borderRadius: 2, background: '#27272a', overflow: 'hidden' }}>
+                      <div style={{ height: 5, borderRadius: 99, background: 'var(--fill)', overflow: 'hidden' }}>
                         <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${sub.percentile}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-                          style={{ height: '100%', borderRadius: 2, background: barColor }}
+                          initial={{ x: '-100%' }}
+                          animate={{ x: `${sub.percentile - 100}%` }}
+                          transition={{ ...spring, visualDuration: 0.7, delay: 0.1 }}
+                          style={{ width: '100%', height: '100%', borderRadius: 99, background: barColor }}
                         />
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <p style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+              <p className="t-caption tertiary" style={{ marginTop: '0.75rem', textAlign: 'center' }}>
                 Based on currently published results · Tap to collapse
               </p>
             </div>
@@ -656,7 +669,7 @@ function PercentileCard({ data, loading }: { data: PercentileData | null; loadin
       </AnimatePresence>
 
       {!expanded && (
-        <p style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+        <p className="t-caption tertiary" style={{ marginTop: '0.6rem', textAlign: 'center' }}>
           Tap to see subject breakdown
         </p>
       )}
@@ -665,49 +678,58 @@ function PercentileCard({ data, loading }: { data: PercentileData | null; loadin
 }
 
 function StatusPill({ a }: { a: Analysis }) {
-  if (a.state === 'zero_credit') return <Pill label="No Credit" color="var(--text-muted)" bg="#18181b" />;
+  if (a.state === 'zero_credit') return <Pill label="No Credit" color="var(--label-2)" bg="var(--fill)" />;
   if (a.impossible)      return <Pill label="Very tough" color="var(--danger)" bg="var(--danger-dim)" />;
   if (a.alreadySecured)  return <Pill label="On track" color="var(--safe)" bg="var(--safe-dim)" />;
   if (a.state === 'complete')   return <Pill label="Done" color="var(--safe)" bg="var(--safe-dim)" />;
-  if (a.state === 'isa2_done')  return <Pill label="ISA Done" color="#ffffff" bg="#18181b" />;
+  if (a.state === 'isa2_done')  return <Pill label="ISA Done" color="var(--tint)" bg="color-mix(in srgb, var(--tint) 14%, transparent)" />;
   if (a.state === 'isa1_done')  return <Pill label="ISA 1 Done" color="var(--warn)" bg="var(--warn-dim)" />;
-  return <Pill label="Not started" color="var(--text-muted)" bg="#18181b" />;
+  return <Pill label="Not started" color="var(--label-2)" bg="var(--fill)" />;
 }
 
 function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
-    <span style={{ background: bg, color, border: `1px solid ${color}33`, borderRadius: '6px', padding: '0.2rem 0.65rem', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+    <span className="badge" style={{ background: bg, color, flexShrink: 0 }}>
       {label}
     </span>
   );
 }
 
 function borderColor(a: Analysis) {
-  if (a.state === 'zero_credit') return '#27272a';
+  if (a.state === 'zero_credit') return 'var(--label-3)';
   if (a.impossible)     return 'var(--danger)';
   if (a.alreadySecured) return 'var(--safe)';
-  if (a.state === 'isa2_done' || a.state === 'isa1_done') return '#ffffff';
-  return '#27272a';
+  if (a.state === 'isa2_done' || a.state === 'isa1_done') return 'var(--tint)';
+  return 'var(--label-3)';
 }
 
 // ─── Loading / Error / Empty ──────────────────────────────────────────────────
 function Spinner() {
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-      <RefreshCw className="w-8 h-8 text-zinc-600 animate-spin" />
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Fetching your results from PESU Academy...</p>
+    <main className="page" style={{ maxWidth: '860px', paddingTop: '4.5rem' }} aria-busy="true" aria-label="Loading results">
+      <div style={{ height: '44px', width: '60%', maxWidth: '320px', marginBottom: '1.5rem', borderRadius: '12px' }} className="shimmer" />
+      <div style={{ display: 'flex', gap: '0.875rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
+        <div style={{ height: '112px', flex: '1 1 150px' }} className="shimmer" />
+        <div style={{ height: '112px', flex: '2 1 280px' }} className="shimmer" />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} style={{ height: '150px' }} className="shimmer" />
+        ))}
+      </div>
     </main>
   );
 }
 
 function ErrorScreen({ msg, onRetry, onBack }: { msg: string; onRetry: () => void; onBack: () => void }) {
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '2rem', textAlign: 'center' }}>
-      <AlertCircle className="w-12 h-12 text-zinc-600 mb-2" />
-      <p style={{ color: 'var(--text-secondary)', maxWidth: '380px' }}>{msg}</p>
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '2rem', textAlign: 'center' }}>
+      <AlertCircle className="w-12 h-12" strokeWidth={1.6} style={{ color: 'var(--label-3)', marginBottom: '0.25rem' }} />
+      <p className="t-title2">Something went wrong</p>
+      <p className="t-body secondary" style={{ maxWidth: '380px' }}>{msg}</p>
       <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-        <button onClick={onBack}  className="px-4 py-2 border border-zinc-800 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">Back</button>
-        <button onClick={onRetry} className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors">Retry</button>
+        <button onClick={onBack}  className="btn-secondary pressable">Back</button>
+        <button onClick={onRetry} className="btn-primary pressable" style={{ width: 'auto', minHeight: 44 }}>Retry</button>
       </div>
     </main>
   );
@@ -715,10 +737,10 @@ function ErrorScreen({ msg, onRetry, onBack }: { msg: string; onRetry: () => voi
 
 function EmptyScreen({ onBack }: { onBack: () => void }) {
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', padding: '2rem' }}>
-      <AlertCircle className="w-12 h-12 text-zinc-600 mb-2" />
-      <p style={{ color: 'var(--text-secondary)' }}>No results data available yet.</p>
-      <button onClick={onBack} className="mt-4 px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-zinc-200 transition-colors">Back</button>
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '2rem', textAlign: 'center' }}>
+      <AlertCircle className="w-12 h-12" strokeWidth={1.6} style={{ color: 'var(--label-3)', marginBottom: '0.25rem' }} />
+      <p className="t-body secondary">No results data available yet.</p>
+      <button onClick={onBack} className="btn-primary pressable" style={{ width: 'auto', minHeight: 44, marginTop: '1rem' }}>Back</button>
     </main>
   );
 }
