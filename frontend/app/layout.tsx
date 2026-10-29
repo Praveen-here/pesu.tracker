@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   title: 'PESU Tracker',
   description: 'Track your PESU Academy attendance with smart analytics — bunk calculator, recovery guide, and subject-wise breakdown.',
   keywords: 'PESU, attendance, tracker, PES University, bunk calculator',
+  appleWebApp: {
+    capable: true,
+    title: 'PESU Tracker',
+    statusBarStyle: 'black-translucent',
+  },
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
