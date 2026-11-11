@@ -3,6 +3,7 @@ const router = express.Router();
 const { fetchAllResults, fetchISAGraph } = require('../services/pesuService');
 const { parseResultsHTML, computeMinMarks, projectSGPA } = require('../services/resultsParser');
 const { calculatePercentile, computeOverallPercentile } = require('../services/percentileService');
+const { handlePesuSessionExpired } = require('../middleware/session');
 
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.srn) {
@@ -60,6 +61,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     return res.json({ ...payload, cached: false });
   } catch (err) {
+    if (handlePesuSessionExpired(err, req, res)) return;
     console.error('[Results] Error:', err.message);
     return res.status(500).json({ error: `Failed to fetch results: ${err.message}` });
   }
@@ -222,6 +224,7 @@ router.get('/percentile', requireAuth, async (req, res) => {
     console.log(`[Percentile] Done: ${overall?.overallPercentile ?? 'N/A'}th percentile`);
     return res.json({ ...payload, cached: false });
   } catch (err) {
+    if (handlePesuSessionExpired(err, req, res)) return;
     console.error('[Percentile] Error:', err.message);
     return res.status(500).json({ error: `Failed to compute percentile: ${err.message}` });
   }

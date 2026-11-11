@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import SubjectCard, { Subject } from '@/components/SubjectCard';
 import OverallRing from '@/components/OverallRing';
-import { getAttendance, refreshAttendance, logout, getMe } from '@/lib/api';
+import { getAttendance, refreshAttendance, logout, getMe, signedOutPath } from '@/lib/api';
 import axios from 'axios';
 import { AlertCircle } from 'lucide-react';
 import NavBar from '@/components/NavBar';
@@ -28,7 +28,7 @@ export default function DashboardPage() {
       setSrn(data.srn || '');
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
-        router.replace('/');
+        router.replace(signedOutPath(err));
       } else {
         setError('Failed to load attendance. Please try refreshing.');
       }

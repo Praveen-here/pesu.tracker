@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { Eye, EyeOff, AlertCircle, Lock } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Lock, Info } from 'lucide-react';
 import ActivityIndicator from '@/components/ActivityIndicator';
 import BrandMark from '@/components/BrandMark';
 import { spring } from '@/lib/motion';
@@ -16,6 +16,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  // Arrived here because the PESU session expired: explain why, then drop the query param
+  // so a reload doesn't show the notice again.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('expired') === '1') {
+      setNotice('Your session has expired. Please sign in again.');
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
 
   const handleSubmit = useCallback(async (e: FormEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -129,6 +139,26 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          {/* Session-expired notice */}
+          {notice && !error && (
+            <p
+              role="status"
+              className="t-subhead"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+                color: 'var(--tint)',
+                background: 'color-mix(in srgb, var(--tint) 12%, transparent)',
+                borderRadius: '12px',
+                padding: '0.7rem 0.9rem',
+              }}
+            >
+              <Info className="w-4 h-4" strokeWidth={2.2} style={{ flexShrink: 0, marginTop: 2 }} />
+              {notice}
+            </p>
+          )}
 
           {/* Error */}
           <AnimatePresence initial={false}>

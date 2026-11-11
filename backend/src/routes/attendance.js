@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { refreshAttendance } = require('../services/pesuService');
+const { handlePesuSessionExpired } = require('../middleware/session');
 
 // Auth guard middleware
 function requireAuth(req, res, next) {
@@ -45,6 +46,7 @@ router.get('/', requireAuth, async (req, res) => {
       fetchedAt: now,
     });
   } catch (err) {
+    if (handlePesuSessionExpired(err, req, res)) return;
     console.error('[Attendance] Fetch error:', err.message);
     return res.status(500).json({ error: 'Failed to fetch attendance. Please log in again.' });
   }
@@ -61,6 +63,7 @@ router.post('/refresh', requireAuth, async (req, res) => {
     );
     return res.json({ attendance, cached: false, fetchedAt: req.session.fetchedAt });
   } catch (err) {
+    if (handlePesuSessionExpired(err, req, res)) return;
     console.error('[Attendance] Refresh error:', err.message);
     return res.status(500).json({ error: 'Failed to refresh attendance.' });
   }

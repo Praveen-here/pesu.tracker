@@ -8,7 +8,7 @@ import { CheckCircle2, AlertCircle, X, TrendingUp, ChevronRight, ChevronDown } f
 import NavBar from '@/components/NavBar';
 import ActivityIndicator from '@/components/ActivityIndicator';
 import { spring, sheetSpring, tap, rise } from '@/lib/motion';
-import { logout, refreshResults, getPercentile } from '@/lib/api';
+import { logout, refreshResults, getPercentile, signedOutPath } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Scenario {
@@ -109,7 +109,7 @@ export default function CGPAPage() {
         setShowOverlay(true);
       }
     } catch (e: unknown) {
-      if (axios.isAxiosError(e) && e.response?.status === 401) router.replace('/');
+      if (axios.isAxiosError(e) && e.response?.status === 401) router.replace(signedOutPath(e));
       else setError('Could not load your results. Please try again.');
     } finally {
       setLoading(false);
@@ -124,9 +124,12 @@ export default function CGPAPage() {
     setPercentileLoading(true);
     getPercentile()
       .then(r => { if (r.data?.overallPercentile != null) setPercentile(r.data); })
-      .catch(() => { /* silently fail — percentile is optional */ })
+      .catch(e => {
+        // Percentile is optional, so other failures stay silent — but a sign-out must redirect.
+        if (axios.isAxiosError(e) && e.response?.status === 401) router.replace(signedOutPath(e));
+      })
       .finally(() => setPercentileLoading(false));
-  }, [data]);
+  }, [data, router]);
 
   async function handleRefresh() {
     setRefreshing(true);

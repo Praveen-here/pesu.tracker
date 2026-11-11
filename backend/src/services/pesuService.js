@@ -6,6 +6,56 @@ const { parseSemesterOptions, parseAttendanceHTML } = require('./parser');
 
 const PESU_BASE = process.env.PESU_BASE_URL || 'https://www.pesuacademy.com/Academy';
 
+/**
+ * Thrown when the stored PESU cookie jar is no longer logged in.
+ * Routes turn this into a 401 SESSION_EXPIRED and end the app session.
+ */
+class PesuSessionExpiredError extends Error {
+  constructor() {
+    super('PESU session expired');
+    this.name = 'PesuSessionExpiredError';
+  }
+}
+
+/**
+ * Unambiguous signs that PESU no longer recognises the session:
+ *  - the request was redirected to the login page (contains the login form action)
+ *  - a 403 rejecting our CSRF token, which only happens once PESU has issued a new session
+ */
+function looksLoggedOut(res) {
+  const html = typeof res.data === 'string' ? res.data : '';
+  if (html.includes('j_spring_security_check')) return true;
+  if (res.status === 403 && /Invalid CSRF Token/i.test(html)) return true;
+  return false;
+}
+
+/**
+ * Some endpoints answer a logged-out client with a bare 500, which looks the same as a
+ * real PESU outage. Load the profile page, which redirects to the login page when the
+ * session is gone. If the probe itself fails we can't tell, so report alive — a PESU
+ * outage should not log anyone out.
+ */
+async function isSessionAlive(client) {
+  try {
+    const res = await client.get(`${PESU_BASE}/s/studentProfilePESU`, { validateStatus: () => true });
+    return !looksLoggedOut(res);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Throw PesuSessionExpiredError if `res` shows the session has expired.
+ * Any other 5xx throws a plain error, as these calls did before.
+ */
+async function assertLoggedIn(client, res) {
+  if (looksLoggedOut(res)) throw new PesuSessionExpiredError();
+  if (res.status >= 500) {
+    if (!(await isSessionAlive(client))) throw new PesuSessionExpiredError();
+    throw new Error(`Request failed with status code ${res.status}`);
+  }
+}
+
 function createClient() {
   const jar = new CookieJar();
   const client = wrapper(
@@ -180,9 +230,11 @@ async function fetchAttendance(client, semesterId, csrf, finalUrl) {
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-TOKEN': csrf,
       },
-      validateStatus: (s) => s < 500,
+      validateStatus: () => true,
     }
   );
+
+  await assertLoggedIn(client, res);
 
   const html = typeof res.data === 'string' ? res.data : '';
   console.log('[PESU] Attendance fetch status:', res.status, '| HTML length:', html.length);
@@ -238,8 +290,9 @@ async function fetchAllResults(serializedJar, csrf, finalUrl) {
   // works for all roles.
   const semRes = await client.get(
     `${PESU_BASE}/s/studentProfile/getEsaAndIsaResultSemBySRN`,
-    { headers: { Referer: finalUrl || `${PESU_BASE}/s/studentProfilePESU`, 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf }, validateStatus: (s) => s < 500 }
+    { headers: { Referer: finalUrl || `${PESU_BASE}/s/studentProfilePESU`, 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf }, validateStatus: () => true }
   );
+  await assertLoggedIn(client, semRes);
   const $sems = cheerio.load(`<select>${semRes.data}</select>`);
   const sems = [];
   $sems('option').each((_, el) => sems.push({ id: $sems(el).attr('value'), label: $sems(el).text().trim() }));
@@ -252,8 +305,9 @@ async function fetchAllResults(serializedJar, csrf, finalUrl) {
     const res = await client.post(
       `${PESU_BASE}/s/studentProfilePESUAdmin`,
       new URLSearchParams({ _csrf: csrf, controllerMode: '6402', actionType: '9', semid: sem.id, menuId: '655' }).toString(),
-      { headers: h, validateStatus: (s) => s < 500 }
+      { headers: h, validateStatus: () => true }
     );
+    await assertLoggedIn(client, res);
     const html = typeof res.data === 'string' ? res.data : '';
     console.log(`[PESU] Results sem=${sem.id} (${sem.label}): len=${html.length}`);
 
@@ -308,9 +362,13 @@ async function fetchISAGraph(serializedJar, csrf, finalUrl, params) {
       validateStatus: (s) => s < 500,
     });
 
+    // An expired session aborts the whole percentile run; other failures still just skip this graph.
+    if (looksLoggedOut(res)) throw new PesuSessionExpiredError();
+
     const html = typeof res.data === 'string' ? res.data : '';
     return parseGraphHTML(html, params.marks);
   } catch (err) {
+    if (err instanceof PesuSessionExpiredError) throw err;
     console.error(`[Graph] Error fetching graph for subject ${params.subjectId}:`, err.message);
     return null;
   }
@@ -346,4 +404,4 @@ function parseGraphHTML(html, studentMarks) {
   }
 }
 
-module.exports = { fullLogin, refreshAttendance, fetchAllResults, fetchISAGraph };
+module.exports = { fullLogin, refreshAttendance, fetchAllResults, fetchISAGraph, PesuSessionExpiredError };
