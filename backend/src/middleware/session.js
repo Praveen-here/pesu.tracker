@@ -1,6 +1,7 @@
 const session = require('express-session');
 const connectRedis = require('connect-redis');
 const { createClient } = require('redis');
+const { PesuSessionExpiredError } = require('../services/pesuService');
 
 async function buildSessionMiddleware() {
   let store;
@@ -42,4 +43,21 @@ async function buildSessionMiddleware() {
   });
 }
 
-module.exports = { buildSessionMiddleware };
+/**
+ * If `err` means the stored PESU login has expired, sign the user out of this app
+ * (there is no stored password to log in again with) and reply 401 SESSION_EXPIRED so
+ * the frontend sends them to the login page. Returns true when it handled the response.
+ */
+function handlePesuSessionExpired(err, req, res) {
+  if (!(err instanceof PesuSessionExpiredError)) return false;
+  console.warn(`[Session] PESU session expired for ${req.session?.srn || 'unknown'} — signing out.`);
+  const reply = () => {
+    res.clearCookie('connect.sid');
+    res.status(401).json({ error: 'Your session has expired. Please sign in again.', code: 'SESSION_EXPIRED' });
+  };
+  if (req.session) req.session.destroy(reply);
+  else reply();
+  return true;
+}
+
+module.exports = { buildSessionMiddleware, handlePesuSessionExpired };
